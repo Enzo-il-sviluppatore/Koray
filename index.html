@@ -153,7 +153,60 @@ for(let i=0;i<1800;i++){
   }
 }
 calcHm();
-
+/* ---------- flowing water ---------- */
+const wl=new Uint8Array(W*H*D),wact=new Set(),ND=[[1,0],[-1,0],[0,1],[0,-1]],ix=(x,y,z)=>(y*D+z)*W+x;
+let wacc=0;
+const lw=(x,y,z)=>wl[ix(x,y,z)]||8;
+const wh=(x,y,z)=>blk(x,y,z)===WATER?(blk(x,y+1,z)===WATER?1:lw(x,y,z)>=8?.88:.1+lw(x,y,z)*.1):0;
+const lvl=(x,y,z)=>blk(x,y,z)===WATER?(blk(x,y+1,z)===WATER?8:lw(x,y,z)):-1;
+function flowDir(x,y,z){
+  const L=lvl(x,y,z);let fx=0,fz=0;
+  for(const[dx,dz]of ND){
+    const n=lvl(x+dx,y,z+dz);let d=0;
+    if(n>=0)d=L-n;else if(inb(x+dx,y,z+dz)&&!blk(x+dx,y,z+dz)&&!blk(x+dx,y-1,z+dz))d=L;
+    fx+=dx*d;fz+=dz*d;
+  }
+  return[fx,fz]}
+function markDirty(x,z){for(const[a,b]of[[0,0],[1,0],[-1,0],[0,1],[0,-1]]){const X=x+a,Z=z+b;if(X>=0&&X<W&&Z>=0&&Z<D)dirty.add((X>>4)+(Z>>4)*NC)}}
+function wake(x,y,z){for(const[a,b,c]of[[0,0,0],[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]])if(inb(x+a,y+b,z+c))wact.add(ix(x+a,y+b,z+c))}
+function setW(x,y,z,t,l){put(x,y,z,t);wl[ix(x,y,z)]=l||0;markDirty(x,z);wake(x,y,z)}
+function flowCell(i){
+  const x=i%W,z=((i/W)|0)%D,y=(i/(W*D))|0;
+  if(world[i]!==WATER)return;
+  let L=lw(x,y,z);const up=blk(x,y+1,z)===WATER;
+  if(L<8){
+    let ok=up;
+    if(!ok)for(const[dx,dz]of ND)if(blk(x+dx,y,z+dz)===WATER&&lw(x+dx,y,z+dz)>L){ok=true;break}
+    if(!ok){setW(x,y,z,0);return}
+    if(up&&L<7){L=7;setW(x,y,z,WATER,7)}
+  }
+  let down=false;
+  if(y>0){
+    const b=blk(x,y-1,z);
+    if(!b){setW(x,y-1,z,WATER,7);down=true}
+    else if(b===WATER){if(lw(x,y-1,z)<7)setW(x,y-1,z,WATER,7);down=true}
+  }
+  if(L>1&&(L===8||!down))for(const[dx,dz]of ND){
+    const nx=x+dx,nz=z+dz;if(!inb(nx,y,nz))continue;
+    const n=blk(nx,y,nz);
+    if(!n||(n===WATER&&lw(nx,y,nz)<L-1))setW(nx,y,nz,WATER,L-1);
+  }
+}
+function flowTick(){const cur=[...wact];wact.clear();cur.forEach((i,n)=>n<3000?flowCell(i):wact.add(i))}
+const WC=document.createElement('canvas');WC.width=WC.height=32;
+{const g=WC.getContext('2d'),im=g.createImageData(32,32);
+for(let y=0;y<32;y++)for(let x=0;x<32;x++){
+  const a=x/32*6.2832,b=y/32*6.2832,k=(Math.sin(a*2+Math.sin(b*2)*1.3)+Math.sin(b*3+a)+Math.sin((a+b)*2)+3)/6,m=.78+k*.5+(k>.82?.35:0);
+  im.data.set([40*m,104*m,210*m,185],(y*32+x)*4);
+}
+g.putImageData(im,0,0)}
+const wT=()=>{const t=new THREE.CanvasTexture(WC);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.magFilter=t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;return t},
+ wM=t=>new THREE.MeshBasicMaterial({map:t,vertexColors:true,transparent:true,depthWrite:false,side:THREE.DoubleSide}),
+ wtS=wT(),wtF=wT(),matWs=wM(wtS),matWf=wM(wtF);
+const nearW=(x,z)=>{for(let dx=-14;dx<=14;dx+=2)for(let dz=-14;dz<=14;dz+=2)if(blk(x+dx,SEA,z+dz)===WATER)return true;return false};
+for(let x=1;x<W-1;x++)for(let z=1;z<D-1;z++)for(let y=2;y<=SEA;y++)
+  if(world[ix(x,y,z)]===WATER&&(!blk(x,y-1,z)||!blk(x+1,y,z)||!blk(x-1,y,z)||!blk(x,y,z+1)||!blk(x,y,z-1)))wact.add(ix(x,y,z));
+  
 /* ---------- rendering ---------- */
 const cv=$('cv'),renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
 const SKY=0x8ec9ff,scene=new THREE.Scene();
@@ -177,20 +230,22 @@ const UV=[[0,0],[1,0],[1,1],[0,1]],AOV=[.5,.7,.85,1],EP=.0004;
 const ao=(a,b,c,p,dp,r,dr)=>{const q=[a,b,c];q[p]+=dp;q[r]+=dr;return solid(q[0],q[1],q[2])?1:0};
 const meshes=[],dirty=new Set();
 function build(ci){
-  const cx=ci%NC,cz=(ci/NC)|0,S=[{p:[],c:[],u:[],i:[],n:0},{p:[],c:[],u:[],i:[],n:0}];
+  const cx=ci%NC,cz=(ci/NC)|0,S=[0,1,2,3].map(()=>({p:[],c:[],u:[],i:[],n:0}));
   for(let y=0;y<H;y++)for(let z=cz*CS;z<cz*CS+CS;z++)for(let x=cx*CS;x<cx*CS+CS;x++){
     const t=world[(y*D+z)*W+x];if(!t)continue;
-    const b=BL[t],tr=b[4]?1:0,o=S[tr];let j=0;
+    const b=BL[t],tr=b[4]?1:0,wt=t===WATER,up=wt&&blk(x,y+1,z)===WATER,wL=wt?lw(x,y,z):0,wH=wt?wh(x,y,z):0,o=S[wt?(wL<8||up?3:2):tr];let j=0,fd=[1,0];
+    if(wt&&!up){const g=flowDir(x,y,z),m=Math.hypot(g[0],g[1]);if(m)fd=[g[0]/m,g[1]/m]}
     for(const f of F){
       const nx=x+f.d[0],ny=y+f.d[1],nz=z+f.d[2];
       if(solid(nx,ny,nz))continue;
-      if(tr&&blk(nx,ny,nz)===t)continue;
+      if(wt){const nh=wh(nx,ny,nz);if(f.d[1]?nh>0:nh>=wH)continue}
+        else if(tr&&blk(nx,ny,nz)===t)continue;
       if(!j)j=1+(hash(x,y,z)-.5)*.1;
       const lt=t===12?1:(ny>hm[nz*W+nx])?1:.55;
       const ti=f.d[1]>0?b[1]:f.d[1]<0?b[3]:b[2],u0=(ti%8)/8,v0=1-((ti>>3)+1)/4;
       for(let q=0;q<4;q++){
         const v=f.v[q];
-        o.p.push(x+v[0],y+v[1],z+v[2]);
+        const py=y+(wt&&v[1]?wH:v[1]);o.p.push(x+v[0],py,z+v[2]);
         let a=1;
         if(!tr&&t!==12){
           const p=f.t[0],r=f.t[1],sp=v[p]*2-1,sr=v[r]*2-1;
@@ -199,7 +254,8 @@ function build(ci){
         }
         const k=f.s*j*lt*a;
         o.c.push(k,k,k);
-        o.u.push(u0+EP+UV[q][0]*(.125-2*EP),v0+EP+UV[q][1]*(.25-2*EP));
+        if(wt){const X=x+v[0],Z=z+v[2];o.u.push(...(f.d[1]?[(X*fd[0]+Z*fd[1])*.5,(Z*fd[0]-X*fd[1])*.5]:[-py*.5,(f.d[0]?Z:X)*.5]))}
+        else o.u.push(u0+EP+UV[q][0]*(.125-2*EP),v0+EP+UV[q][1]*(.25-2*EP));
       }
       o.i.push(o.n,o.n+1,o.n+2,o.n,o.n+2,o.n+3);o.n+=4;
     }
@@ -211,12 +267,12 @@ function build(ci){
     g.setAttribute('color',new THREE.Float32BufferAttribute(o.c,3));
     g.setAttribute('uv',new THREE.Float32BufferAttribute(o.u,2));
     g.setIndex(o.i);
-    const m=new THREE.Mesh(g,k?matT:matO);m.renderOrder=k;scene.add(m);return m;
+    const m=new THREE.Mesh(g,[matO,matT,matWs,matWf][k]);m.renderOrder=k;scene.add(m);return m;
   });
 }
 for(let i=0;i<NC*NC;i++)build(i);
 function setBlock(x,y,z,t){
-  put(x,y,z,t);hm[z*W+x]=colTop(x,z);
+  put(x,y,z,t);wl[ix(x,y,z)]=0;hm[z*W+x]=colTop(x,z);wake(x,y,z);
   const cx=x>>4,cz=z>>4;dirty.add(cx+cz*NC);
   if((x&15)===0&&cx>0)dirty.add(cx-1+cz*NC);
   if((x&15)===15&&cx<NC-1)dirty.add(cx+1+cz*NC);
@@ -236,7 +292,7 @@ for(let i=0;i<45;i++){
 let spx=W>>1,spz=D>>1;
 outer:for(let r=0;r<90;r+=3)for(let a=0;a<12;a++){
   const x=((W>>1)+Math.cos(a*.5236)*r)|0,z=((D>>1)+Math.sin(a*.5236)*r)|0,g=blk(x,hm[z*W+x],z);
-  if(hm[z*W+x]>SEA+1&&(g===1||g===4||g===10)){spx=x;spz=z;break outer}
+  if(hm[z*W+x]>SEA+1&&(g===1||g===4||g===10)&&(nearW(x,z)||r>84)){spx=x;spz=z;break outer}
 }
 const P={x:spx+.5,y:hm[spz*W+spx]+1,z:spz+.5,vx:0,vy:0,vz:0,yaw:0,pitch:-.2,ground:false,fly:false};
 const hit=(x,y,z)=>{
@@ -254,13 +310,13 @@ function update(dt){
   const k=keys;
   P.yaw+=((k.ArrowLeft?1:0)-(k.ArrowRight?1:0))*2*dt;
   P.pitch=Math.max(-1.55,Math.min(1.55,P.pitch+((k.ArrowUp?1:0)-(k.ArrowDown?1:0))*1.5*dt));
-  const wet=blk(Math.floor(P.x),Math.floor(P.y+.5),Math.floor(P.z))===WATER;
+  const px=Math.floor(P.x),pz=Math.floor(P.z),wy=P.y+.4,hy=P.y+1.62,wet=wy-Math.floor(wy)<wh(px,Math.floor(wy),pz),head=hy-Math.floor(hy)<wh(px,Math.floor(hy),pz);
   const f=(k.KeyW?1:0)-(k.KeyS?1:0),r=(k.KeyD?1:0)-(k.KeyA?1:0),l=Math.hypot(f,r)||1;
   const sp=P.fly?12:wet?2.8:k.ShiftLeft?7.5:5;
   const s=Math.sin(P.yaw),c=Math.cos(P.yaw);
-  P.vx=(-s*f+c*r)/l*sp;P.vz=(-c*f-s*r)/l*sp;
+  P.vx=(-s*f+c*r)/l*sp;P.vz=(-c*f-s*r)/l*sp; if(wet&&!P.fly){const g=flowDir(px,Math.floor(wy),pz),m=Math.hypot(g[0],g[1]);if(m){P.vx+=g[0]/m*2.4;P.vz+=g[1]/m*2.4}};
   if(P.fly)P.vy=((k.Space?1:0)-(k.ShiftLeft||k.ShiftRight?1:0))*8;
-  else if(wet){P.vy=Math.max(-3,P.vy-10*dt);if(k.Space)P.vy=3.5}
+  else if(wet){P.vy=k.Space?(head?3.8:7.5):(k.ShiftLeft||k.ShiftRight)?-3.8:f>0?Math.sin(P.pitch)*sp:-1.2}
   else{P.vy=Math.max(-40,P.vy-28*dt);if(k.Space&&P.ground)P.vy=8.5}
   P.ground=false;
   step('x',P.vx*dt);step('z',P.vz*dt);step('y',P.vy*dt);
@@ -342,11 +398,12 @@ function frame(now){
   requestAnimationFrame(frame);
   const dt=Math.min(.05,(now-last)/1000);last=now;
   if(playing)update(dt);
-  for(const ci of dirty)build(ci);
-  dirty.clear();
+   wacc+=dt;if(wacc>.12){wacc=0;flowTick()}
+  wtS.offset.x=-(now/1000*.04)%1;wtF.offset.x=-(now/1000*.5)%1;
+  let nb=0;for(const ci of dirty){dirty.delete(ci);build(ci);if(++nb>=4)break}
   for(const c of clouds){c.position.x+=dt*1.5;if(c.position.x>W+80)c.position.x=-80}
   camera.position.set(P.x,P.y+1.62,P.z);camera.rotation.set(P.pitch,P.yaw,0);
-  const cp=camera.position,uw=blk(Math.floor(cp.x),Math.floor(cp.y),Math.floor(cp.z))===WATER;
+  const cp=camera.position,cy=Math.floor(cp.y),uw=cp.y-cy<wh(Math.floor(cp.x),cy,Math.floor(cp.z));
   scene.fog.color.set(uw?0x1d55a0:SKY);scene.background.set(uw?0x1d55a0:SKY);
   scene.fog.near=uw?1:60;scene.fog.far=uw?24:150;
   const h=playing?ray():null;
