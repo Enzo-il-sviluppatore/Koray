@@ -59,14 +59,14 @@ const inb=(x,y,z)=>x>=0&&x<W&&y>=0&&y<H&&z>=0&&z<D;
 const blk=(x,y,z)=>inb(x,y,z)?world[(y*D+z)*W+x]:0;
 const solid=(x,y,z)=>(y<0||x<0||x>=W||z<0||z>=D)?true:y>=H?false:world[(y*D+z)*W+x]>0;
 const put=(x,y,z,t)=>{if(inb(x,y,z))world[(y*D+z)*W+x]=t};
-const top=(x,z)=>{for(let y=H-1;y>=0;y--)if(blk(x,y,z))return y;return 0};
+const topY=(x,z)=>{for(let y=H-1;y>=0;y--)if(blk(x,y,z))return y;return 0};
 
 for(let x=0;x<W;x++)for(let z=0;z<D;z++){
   const h=Math.floor(8+noise(x/26,z/26)*14+noise(x/10,z/10)*5+noise(x/4,z/4)*1.5),beach=h<14;
   for(let y=0;y<=h;y++)put(x,y,z,y===h?(beach?6:1):y>h-4?(beach?6:2):3);
 }
 for(let i=0;i<80;i++){
-  const x=4+Math.floor(Math.random()*(W-8)),z=4+Math.floor(Math.random()*(D-8)),gy=top(x,z);
+  const x=4+Math.floor(Math.random()*(W-8)),z=4+Math.floor(Math.random()*(D-8)),gy=topY(x,z);
   if(blk(x,gy,z)!==1)continue;
   const h=4+Math.floor(Math.random()*2);
   for(let y=1;y<=h;y++)put(x,gy+y,z,4);
@@ -130,7 +130,7 @@ const box=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1
 box.visible=false;scene.add(box);
 
 /* ---------- player ---------- */
-const P={x:W/2+.5,y:top(W/2,D/2)+1,z:D/2+.5,vx:0,vy:0,vz:0,yaw:0,pitch:-.2,ground:false,fly:false};
+const P={x:W/2+.5,y:topY(W/2,D/2)+1,z:D/2+.5,vx:0,vy:0,vz:0,yaw:0,pitch:-.2,ground:false,fly:false};
 const hit=(x,y,z)=>{
   for(let i=Math.floor(x-.3);i<=Math.floor(x+.3);i++)
   for(let j=Math.floor(y);j<=Math.floor(y+1.79);j++)
