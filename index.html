@@ -24,7 +24,6 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 #menu h1{margin:0 0 8px;font-size:28px;letter-spacing:-.01em}
 #menu p{margin:6px 0}
 #menu b{font-weight:650}
-#go{margin-top:6px;font:600 16px system-ui,sans-serif;padding:10px 28px;border:0;border-radius:8px;background:var(--sel);color:#1d2419;cursor:pointer}
 </style>
 </head>
 <body>
@@ -34,12 +33,13 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 <div id="bar"></div>
 <div id="menu"><div>
 <h1>Blockcraft</h1>
-<p><b>Click to play.</b> A fresh world is generated every time you load the page.</p>
-<p><button id="go">Play</button></p>
-<p>W A S D to move, Space to jump<br>Left click breaks a block, right click places one<br>1–7 or the scroll wheel picks a block<br>F toggles flying (Space up, Shift down)<br>Esc pauses</p>
-<p>If your browser can’t lock the mouse, look around with the arrow keys.</p>
+<p><b>Press Enter or Space to play.</b> (Clicking also works.)</p>
+<p>W A S D to move, Space to jump<br>E breaks a block, Q places one (or left and right click)<br>1–7 or the scroll wheel picks a block<br>F toggles flying (Space up, Shift down)<br>Arrow keys look around<br>Esc pauses, Enter resumes</p>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+if(typeof THREE==='undefined'){document.querySelector('#menu div').innerHTML='<h1>Couldn’t load three.js</h1><p>The game needs an internet connection to download the three.js library. Check your connection, then reload the page.</p>'}
+</script>
 <script>
 const W=64,D=64,H=40,CS=16,NC=W/CS,SEED=Math.random()*1000;
 const world=new Uint8Array(W*H*D);
@@ -193,15 +193,48 @@ addEventListener('mousemove',e=>{
   P.yaw-=e.movementX*.0022;
   P.pitch=Math.max(-1.55,Math.min(1.55,P.pitch-e.movementY*.0022));
 });
+const overlap=(x,y,z)=>P.x+.3>x&&P.x-.3<x+1&&P.y+1.8>y&&P.y<y+1&&P.z+.3>z&&P.z-.3<z+1;
+function act(btn){
+  const h=ray();if(!h)return;
+  if(btn===0){if(h.y>0)setBlock(h.x,h.y,h.z,0)}
+  else if(btn===2){
+    const x=h.x+h.n[0],y=h.y+h.n[1],z=h.z+h.n[2];
+    if(inb(x,y,z)&&!blk(x,y,z)&&!overlap(x,y,z))setBlock(x,y,z,sel);
+  }
+}
 addEventListener('keydown',e=>{
-  if(e.code==='Escape'&&playing&&!document.pointerLockElement)return pause();
-  if(!playing)return;
+  if(!playing){
+    if(e.code==='Enter'||e.code==='Space'){e.preventDefault();play()}
+    return;
+  }
+  if(e.code==='Escape'&&!document.pointerLockElement)return pause();
   if(/^(Space|Arrow)/.test(e.code))e.preventDefault();
   keys[e.code]=true;
   if(e.code==='KeyF'){P.fly=!P.fly;P.vy=0}
+  if(e.code==='KeyE'&&!e.repeat)act(0);
+  if(e.code==='KeyQ'&&!e.repeat)act(2);
   if(/^Digit[1-7]$/.test(e.code))pick(+e.code[5]);
 });
 addEventListener('keyup',e=>{keys[e.code]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
 addEventListener('wheel',e=>{if(playing)pick(sel+(e.deltaY>0?1:-1))});
-addEventListener('contextmenu',e=>e.pre
+addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('mousedown',e=>{if(playing)act(e.button)});
+
+/* ---------- loop ---------- */
+let last=performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(playing)update(dt);
+  for(const ci of dirty)build(ci);
+  dirty.clear();
+  camera.position.set(P.x,P.y+1.62,P.z);camera.rotation.set(P.pitch,P.yaw,0);
+  const h=playing?ray():null;
+  box.visible=!!h;if(h)box.position.set(h.x+.5,h.y+.5,h.z+.5);
+  renderer.render(scene,camera);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
