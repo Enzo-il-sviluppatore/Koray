@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blockcraft</title>
+<style>
+:root{--panel:rgba(255,255,255,.86);--ink:#1d2419;--sel:#ffd23f;--veil:rgba(20,30,15,.5)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--panel:rgba(24,30,22,.86);--ink:#eef3e8;--veil:rgba(0,0,0,.6)}}
+:root[data-theme="dark"]{--panel:rgba(24,30,22,.86);--ink:#eef3e8;--veil:rgba(0,0,0,.6)}
+html,body{margin:0;height:100%;overflow:hidden;background:#8ec9ff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#cross{position:fixed;left:50%;top:50%;width:20px;height:20px;margin:-10px;pointer-events:none;mix-blend-mode:difference}
+#cross:before,#cross:after{content:"";position:absolute;background:#fff}
+#cross:before{left:9px;top:0;width:2px;height:20px}
+#cross:after{top:9px;left:0;height:2px;width:20px}
+#bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:6px;padding:6px;background:var(--panel);color:var(--ink);border-radius:10px;max-width:calc(100% - 16px);box-sizing:border-box}
+.slot{width:42px;height:42px;border-radius:6px;border:3px solid transparent;position:relative;box-sizing:border-box;cursor:pointer}
+.slot.on{border-color:var(--sel)}
+.slot i{position:absolute;right:3px;bottom:1px;font:600 11px system-ui;color:#fff;text-shadow:0 0 3px #000}
+#name{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom,0px));padding:2px 10px;border-radius:6px;background:var(--panel);color:var(--ink);font-size:13px}
+#menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--veil);cursor:pointer;padding:16px;box-sizing:border-box}
+#menu div{background:var(--panel);color:var(--ink);padding:24px 28px;border-radius:14px;max-width:360px;line-height:1.55;font-size:15px}
+#menu h1{margin:0 0 8px;font-size:28px;letter-spacing:-.01em}
+#menu p{margin:6px 0}
+#menu b{font-weight:650}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="cross"></div>
+<div id="name"></div>
+<div id="bar"></div>
+<div id="menu"><div>
+<h1>Blockcraft</h1>
+<p><b>Click to play.</b> A fresh world is generated every time you load the page.</p>
+<p>W A S D to move, Space to jump<br>Left click breaks a block, right click places one<br>1–7 or the scroll wheel picks a block<br>F toggles flying (Space up, Shift down)<br>Esc pauses</p>
+<p>If your browser can’t lock the mouse, look around with the arrow keys.</p>
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const W=64,D=64,H=40,CS=16,NC=W/CS,SEED=Math.random()*1000;
+const world=new Uint8Array(W*H*D);
+const mk=(t,s,b,g)=>({t:new THREE.Color(t),s:new THREE.Color(s==null?t:s),b:new THREE.Color(b==null?t:b),g});
+const B=[null,mk(0x62ad3d,0x8a6a45,0x7a5632,1),mk(0x7a5632),mk(0x8b8b8b),mk(0xa68558,0x6b4a2b),mk(0x3f8a2c),mk(0xe3d59b),mk(0xb98a4e)];
+const NAMES=['','Grass','Dirt','Stone','Wood','Leaves','Sand','Planks'];
+const $=id=>document.getElementById(id);
+
+/* ---------- terrain ---------- */
+const rnd=(x,z)=>{const n=Math.sin(x*127.1+z*311.7+SEED)*43758.5453;return n-Math.floor(n)};
+const sm=t=>t*t*(3-2*t);
+function noise(x,z){const xi=Math.floor(x),zi=Math.floor(z),xf=sm(x-xi),zf=sm(z-zi);
+  const a=rnd(xi,zi),b=rnd(xi+1,zi),c=rnd(xi,zi+1),d=rnd(xi+1,zi+1);
+  return a+(b-a)*xf+(c-a)*zf+(a-b-c+d)*xf*zf}
+const hash=(x,y,z)=>{const n=Math.sin(x*12.9898+y*78.233+z*37.719)*43758.5453;return n-Math.floor(n)};
+const inb=(x,y,z)=>x>=0&&x<W&&y>=0&&y<H&&z>=0&&z<D;
+const blk=(x,y,z)=>inb(x,y,z)?world[(y*D+z)*W+x]:0;
+const solid=(x,y,z)=>(y<0||x<0||x>=W||z<0||z>=D)?true:y>=H?false:world[(y*D+z)*W+x]>0;
+const put=(x,y,z,t)=>{if(inb(x,y,z))world[(y*D+z)*W+x]=t};
+const top=(x,z)=>{for(let y=H-1;y>=0;y--)if(blk(x,y,z))return y;return 0};
+
+for(let x=0;x<W;x++)for(let z=0;z<D;z++){
+  const h=Math.floor(8+noise(x/26,z/26)*14+noise(x/10,z/10)*5+noise(x/4,z/4)*1.5),beach=h<14;
+  for(let y=0;y<=h;y++)put(x,y,z,y===h?(beach?6:1):y>h-4?(beach?6:2):3);
+}
+for(let i=0;i<80;i++){
+  const x=4+Math.floor(Math.random()*(W-8)),z=4+Math.floor(Math.random()*(D-8)),gy=top(x,z);
+  if(blk(x,gy,z)!==1)continue;
+  const h=4+Math.floor(Math.random()*2);
+  for(let y=1;y<=h;y++)put(x,gy+y,z,4);
+  for(let dx=-2;dx<=2;dx++)for(let dz=-2;dz<=2;dz++)for(let dy=h-1;dy<=h+1;dy++){
+    if(Math.abs(dx)===2&&Math.abs(dz)===2)continue;
+    if(dy===h+1&&(Math.abs(dx)>1||Math.abs(dz)>1))continue;
+    if(!blk(x+dx,gy+dy,z+dz))put(x+dx,gy+dy,z+dz,5);
+  }
+}
+
+/* ---------- rendering ---------- */
+const cv=$('cv'),renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+const scene=new THREE.Scene(),SKY=0x8ec9ff;
+scene.background=new THREE.Color(SKY);scene.fog=new THREE.Fog(SKY,28,72);
+const camera=new THREE.PerspectiveCamera(75,1,.05,200);camera.rotation.order='YXZ';
+const mat=new THREE.MeshBasicMaterial({vertexColors:true});
+function resize(){renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+
+const F=[
+ {d:[1,0,0],v:[[1,0,1],[1,0,0],[1,1,0],[1,1,1]],s:.8},
+ {d:[-1,0,0],v:[[0,0,0],[0,0,1],[0,1,1],[0,1,0]],s:.8},
+ {d:[0,1,0],v:[[0,1,1],[1,1,1],[1,1,0],[0,1,0]],s:1},
+ {d:[0,-1,0],v:[[0,0,0],[1,0,0],[1,0,1],[0,0,1]],s:.5},
+ {d:[0,0,1],v:[[0,0,1],[1,0,1],[1,1,1],[0,1,1]],s:.9},
+ {d:[0,0,-1],v:[[1,0,0],[0,0,0],[0,1,0],[1,1,0]],s:.7}];
+const meshes=[],dirty=new Set();
+function build(ci){
+  const cx=ci%NC,cz=(ci/NC)|0,pos=[],col=[],ind=[];let n=0;
+  for(let y=0;y<H;y++)for(let z=cz*CS;z<cz*CS+CS;z++)for(let x=cx*CS;x<cx*CS+CS;x++){
+    const t=world[(y*D+z)*W+x];if(!t)continue;
+    const b=B[t],j=1+(hash(x,y,z)-.5)*.16;
+    for(const f of F){
+      if(solid(x+f.d[0],y+f.d[1],z+f.d[2]))continue;
+      const side=f.d[1]===0,base=f.d[1]>0?b.t:f.d[1]<0?b.b:b.s,k=f.s*j;
+      for(const v of f.v){
+        pos.push(x+v[0],y+v[1],z+v[2]);
+        const c=(b.g&&side&&v[1])?b.t:base;
+        col.push(c.r*k,c.g*k,c.b*k);
+      }
+      ind.push(n,n+1,n+2,n,n+2,n+3);n+=4;
+    }
+  }
+  if(meshes[ci]){scene.remove(meshes[ci]);meshes[ci].geometry.dispose()}
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  g.setIndex(ind);
+  const m=new THREE.Mesh(g,mat);scene.add(m);meshes[ci]=m;
+}
+for(let i=0;i<NC*NC;i++)build(i);
+function setBlock(x,y,z,t){
+  put(x,y,z,t);
+  const cx=x>>4,cz=z>>4;dirty.add(cx+cz*NC);
+  if((x&15)===0&&cx>0)dirty.add(cx-1+cz*NC);
+  if((x&15)===15&&cx<NC-1)dirty.add(cx+1+cz*NC);
+  if((z&15)===0&&cz>0)dirty.add(cx+(cz-1)*NC);
+  if((z&15)===15&&cz<NC-1)dirty.add(cx+(cz+1)*NC);
+}
+const box=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.006,1.006,1.006)),new THREE.LineBasicMaterial({color:0x000000,fog:false}));
+box.visible=false;scene.add(box);
+
+/* ---------- player ---------- */
+const P={x:W/2+.5,y:top(W/2,D/2)+1,z:D/2+.5,vx:0,vy:0,vz:0,yaw:0,pitch:-.2,ground:false,fly:false};
+const hit=(x,y,z)=>{
+  for(let i=Math.floor(x-.3);i<=Math.floor(x+.3);i++)
+  for(let j=Math.floor(y);j<=Math.floor(y+1.79);j++)
+  for(let k=Math.floor(z-.3);k<=Math.floor(z+.3);k++)if(solid(i,j,k))return true;
+  return false};
+function step(a,d){
+  const n={x:P.x,y:P.y,z:P.z};n[a]+=d;
+  if(!hit(n.x,n.y,n.z))P[a]=n[a];
+  else if(a==='y'){if(d<0){P.ground=true;P.y=Math.floor(P.y+1e-4)}P.vy=0}
+}
+const keys={};
+function update(dt){
+  const k=keys;
+  P.yaw+=((k.ArrowLeft?1:0)-(k.ArrowRight?1:0))*2*dt;
+  P.pitch=Math.max(-1.55,Math.min(1.55,P.pitch+((k.ArrowUp?1:0)-(k.ArrowDown?1:0))*1.5*dt));
+  const f=(k.KeyW?1:0)-(k.KeyS?1:0),r=(k.KeyD?1:0)-(k.KeyA?1:0),l=Math.hypot(f,r)||1,sp=P.fly?10:5;
+  const s=Math.sin(P.yaw),c=Math.cos(P.yaw);
+  P.vx=(-s*f+c*r)/l*sp;P.vz=(-c*f-s*r)/l*sp;
+  if(P.fly)P.vy=((k.Space?1:0)-(k.ShiftLeft||k.ShiftRight?1:0))*8;
+  else{P.vy=Math.max(-40,P.vy-28*dt);if(k.Space&&P.ground)P.vy=8.5}
+  P.ground=false;
+  step('x',P.vx*dt);step('z',P.vz*dt);step('y',P.vy*dt);
+}
+function ray(){
+  const o=camera.position,d=new THREE.Vector3();camera.getWorldDirection(d);
+  let x=Math.floor(o.x),y=Math.floor(o.y),z=Math.floor(o.z);
+  const sx=Math.sign(d.x),sy=Math.sign(d.y),sz=Math.sign(d.z);
+  const dx=d.x?1/Math.abs(d.x):Infinity,dy=d.y?1/Math.abs(d.y):Infinity,dz=d.z?1/Math.abs(d.z):Infinity;
+  let tx=d.x?(sx>0?x+1-o.x:o.x-x)*dx:Infinity,ty=d.y?(sy>0?y+1-o.y:o.y-y)*dy:Infinity,tz=d.z?(sz>0?z+1-o.z:o.z-z)*dz:Infinity;
+  let n=[0,0,0],t=0;
+  while(t<6){
+    if(blk(x,y,z))return{x,y,z,n};
+    if(tx<ty&&tx<tz){x+=sx;t=tx;tx+=dx;n=[-sx,0,0]}
+    else if(ty<tz){y+=sy;t=ty;ty+=dy;n=[0,-sy,0]}
+    else{z+=sz;t=tz;tz+=dz;n=[0,0,-sz]}
+  }
+  return null}
+
+/* ---------- input & hotbar ---------- */
+let sel=1,playing=false;
+const bar=$('bar');
+for(let i=1;i<=7;i++){
+  const b=B[i],e=document.createElement('div');
+  e.className='slot';e.innerHTML='<i>'+i+'</i>';
+  e.style.background='linear-gradient(#'+b.t.getHexString()+' 35%,#'+b.s.getHexString()+' 35%)';
+  e.onclick=()=>pick(i);bar.appendChild(e);
+}
+function pick(i){sel=((i-1+7)%7)+1;[...bar.children].forEach((e,j)=>e.classList.toggle('on',j+1===sel));$('name').textContent=NAMES[sel]}
+pick(1);
+const menu=$('menu');
+function play(){
+  playing=true;menu.style.display='none';
+  try{const p=cv.requestPointerLock();if(p&&p.catch)p.catch(()=>{})}catch(e){}
+}
+function pause(){playing=false;menu.style.display='flex';for(const k in keys)keys[k]=false}
+menu.onclick=play;
+document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement&&playing)pause()});
+addEventListener('mousemove',e=>{
+  if(!playing||!document.pointerLockElement)return;
+  P.yaw-=e.movementX*.0022;
+  P.pitch=Math.max(-1.55,Math.min(1.55,P.pitch-e.movementY*.0022));
+});
+addEventListener('keydown',e=>{
+  if(e.code==='Escape'&&playing&&!document.pointerLockElement)return pause();
+  if(!playing)return;
+  if(/^(Space|Arrow)/.test(e.code))e.preventDefault();
+  keys[e.code]=true;
+  if(e.code==='KeyF'){P.fly=!P.fly;P.vy=0}
+  if(/^Digit[1-7]$/.test(e.code))pick(+e.code[5]);
+});
+addEventListener('keyup',e=>{keys[e.code]=false});
+addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+addEventListener('wheel',e=>{if(playing)pick(sel+(e.deltaY>0?1:-1))});
+addEventListener('contextmenu',e=>e.preventDefault());
+const overlap=(x,y,z)=>P.x+.3>x&&P.x-.3<x+1&&P.y+1.8>y&&P.y<y+1&&P.z+.3>z&&P.z-.3<z+1;
+addEventListener('mousedown',e=>{
+  if(!playing)return;
+  const h=ray();if(!h)return;
+  if(e.button===0){if(h.y>0)setBlock(h.x,h.y,h.z,0)}
+  else if(e.button===2){
+    const x=h.x+h.n[0],y=h.y+h.n[1],z=h.z+h.n[2];
+    if(inb(x,y,z)&&!blk(x,y,z)&&!overlap(x,y,z))setBlock(x,y,z,sel);
+  }
+});
+
+/* ---------- loop ---------- */
+let last=performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(playing)update(dt);
+  for(const ci of dirty)build(ci);
+  dirty.clear();
+  camera.position.set(P.x,P.y+1.62,P.z);camera.rotation.set(P.pitch,P.yaw,0);
+  const h=playing?ray():null;
+  box.visible=!!h;if(h)box.position.set(h.x+.5,h.y+.5,h.z+.5);
+  renderer.render(scene,camera);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
