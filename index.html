@@ -42,6 +42,11 @@ canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
 #ih{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 #ih h2{margin:0;font-size:20px}
 #ih button{font:600 13px system-ui;padding:7px 12px;border-radius:8px;border:0;background:var(--sel);color:#1d2419;cursor:pointer;margin-left:4px}
+#gf{margin-bottom:6px}
+#sq{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid rgba(128,128,128,.5);background:rgba(128,128,128,.12);color:var(--ink);font:15px system-ui;user-select:text;-webkit-user-select:text}
+#chips{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 2px}
+#chips button{font:600 12px system-ui;padding:5px 9px;border-radius:14px;border:1px solid rgba(128,128,128,.5);background:transparent;color:var(--ink);cursor:pointer}
+#chips button.on{background:var(--sel);color:#1d2419;border-color:var(--sel)}
 #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:6px;overflow:auto;padding:2px;touch-action:pan-y}
 .cell{aspect-ratio:1;border-radius:7px;border:2px solid rgba(128,128,128,.45);position:relative;cursor:pointer;box-sizing:border-box;background:rgba(128,128,128,.15);overflow:hidden}
 #is{font-size:13px;margin-top:8px;opacity:.85}
@@ -60,6 +65,7 @@ canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
 <div id="hud"><div id="name"></div><div id="bar"></div></div>
 <div id="inv"><div id="ip">
 <div id="ih"><h2>Inventory</h2><span><button id="md"></button><button id="clr">Clear slot</button><button id="cls">Close</button></span></div>
+<div id="gf"><input id="sq" type="search" placeholder="Search blocks"><div id="chips"></div></div>
 <div id="grid"></div><div id="is"></div>
 </div></div>
 <div id="menu"><div><h1>Blockcraft</h1><p><b id="mt"></b></p><p id="mh"></p></div></div>
@@ -74,13 +80,13 @@ const W=touch?128:192,D=W,H=64,CS=16,NC=W/CS,SEA=22,SEED=Math.random()*1000;
 const world=new Uint8Array(W*H*D),hm=new Int16Array(W*D);
 const $=id=>document.getElementById(id);
 
-/* ---------- blocks: [name, top tile, side tile, bottom tile, transparent?] ---------- */
+/* ---------- blocks: [name, top tile, side tile, bottom tile, transparent?, group] ---------- */
 const BL=[null,['Grass',0,1,2],['Dirt',2,2,2],['Stone',3,3,3],['Sand',4,4,4],['Wood',6,5,6],['Leaves',7,7,7],['Planks',8,8,8],['Cobblestone',9,9,9],['Brick',10,10,10],['Snow',11,12,2],['Glass',14,14,14,1],['Lamp',21,21,21],['Cactus',20,19,20],['Sandstone',23,23,23],['Coal ore',15,15,15],['Iron ore',16,16,16],['Gold ore',17,17,17],['Diamond ore',18,18,18],['Water',13,13,13,1],['Bedrock',22,22,22],['Gravel',24,24,24],['Clay',25,25,25],['Stone bricks',26,26,26],['Obsidian',27,27,27],['Ice',28,28,28,1],['Birch wood',6,29,6],['Dark planks',30,30,30],['Bookshelf',8,31,8],['White wool',32,32,32],['Red wool',33,33,33],['Blue wool',34,34,34],['Green wool',35,35,35],['Yellow wool',36,36,36],['Black wool',37,37,37],['Jack o’lantern',39,38,39],['Mossy cobblestone',40,40,40]];
-const WATER=19,GLOW=[12,35],PAL=[];for(let i=1;i<BL.length;i++)if(i!==20)PAL.push(i);
+const WATER=19,GLOW=[12,35],PAL=[];
 const isOpq=t=>t>0&&!BL[t][4];
 
-/* ---------- procedural texture atlas (8 x 6 tiles of 16px) ---------- */
-const AT=document.createElement('canvas');AT.width=128;AT.height=96;
+/* ---------- procedural texture atlas (8 columns x 22 rows of 16px tiles) ---------- */
+const AT=document.createElement('canvas');AT.width=128;AT.height=352;
 const ac=AT.getContext('2d');
 const R=(i,x,y)=>{const n=Math.sin((i*37.3+x*12.9898+y*78.233)*1.7)*43758.5453;return n-Math.floor(n)};
 const sh=(c,r,v)=>c.map(u=>Math.max(0,Math.min(255,u*(1+(r-.5)*(v||.25)))));
@@ -126,6 +132,88 @@ tile(31,(x,y,r)=>(y<2||y>13||(y>6&&y<9))?sh([188,144,84],r,.14):sh([[150,50,40],
 tile(38,(x,y,r)=>((y>4&&y<8&&((x>2&&x<6)||(x>9&&x<13)))||(y>9&&y<12&&x>3&&x<12))?[255,230,110]:sh([226,128,24],r,.2));
 tile(39,(x,y,r)=>sh([180,96,14],r,.3));
 tile(40,(x,y,r,q)=>q>.55?sh([70,120,50],r,.4):sh(ST,R(40,x>>1,y>>1),.7));
+
+/* ---------- extra blocks (generated) ---------- */
+let TN=41;const ID={},DR={};
+const addB=(k,n,t,s,b,tr,g)=>{BL.push([n,t,s,b,tr?1:0,g]);return ID[k]=BL.length-1};
+const T1=fn=>{tile(TN,fn);return TN++},ft=a=>typeof a==='number'?a:T1(a);
+Object.entries({Nature:[1,2,4,6,10,13,19,21,22,25],Stone:[3,8,9,14,23,24,36],Ores:[15,16,17,18],Wood:[5,7,26,27,28],Light:[12,35],Color:[29,30,31,32,33,34],Glass:[11]}).forEach(([g,a])=>a.forEach(i=>BL[i][5]=g));
+const CL=[['White',[236,236,232]],['Orange',[226,112,22]],['Magenta',[180,62,172]],['Light blue',[62,162,224]],['Yellow',[234,200,40]],['Lime',[112,192,30]],['Pink',[238,142,172]],['Gray',[66,70,74]],['Light gray',[154,154,150]],['Cyan',[24,142,152]],['Purple',[122,46,172]],['Blue',[48,62,164]],['Brown',[104,66,38]],['Green',[82,112,42]],['Red',[172,50,46]],['Black',[26,26,30]]];
+const HAVE=['White','Red','Blue','Green','Yellow','Black'];
+CL.forEach(([n,c])=>{if(!HAVE.includes(n)){const t=T1((x,y,r)=>sh(c,r,.1));addB('wool'+n,n+' wool',t,t,t,0,'Color')}});
+CL.forEach(([n,c])=>{const t=T1((x,y,r)=>sh(c,r,.04));addB('conc'+n,n+' concrete',t,t,t,0,'Color')});
+CL.forEach(([n,c])=>{const m=c.map(u=>u*.55+60),t=T1((x,y,r)=>sh(m,r,.1));addB('terra'+n,n+' terracotta',t,t,t,0,'Color')});
+CL.forEach(([n,c])=>{const t=T1((x,y)=>(x%15===0||y%15===0)?[...c,240]:(x===y&&x>2&&x<7)?[255,255,255,170]:[...c,105]);DR[addB('glass'+n,n+' glass',t,t,t,1,'Glass')]=0});
+const RC={
+ n:(c,v)=>{const t=T1((x,y,r)=>sh(c,r,v));return[t,t,t]},
+ sp:(c,s)=>{const t=T1((x,y,r,q)=>q>.72?sh(s,r,.3):sh(c,r,.25));return[t,t,t]},
+ ore:c=>{const k=TN,t=T1((x,y,r,q)=>R(k,x>>1,y>>1)>.78?sh(c,q,.35):sh(ST,r,.3));return[t,t,t]},
+ blk:c=>{const t=T1((x,y,r)=>(x%15===0||y%15===0)?c.map(u=>u*.78):(x+y>5&&x+y<9&&x<7)?c.map(u=>u*1.3):sh(c,r,.1));return[t,t,t]},
+ bnd:c=>{const t=T1((x,y,r)=>y%5===4?sh(c.map(u=>u*.9),r,.1):sh(c,r,.12));return[t,t,t]},
+ grd:(c,l)=>{const t=T1((x,y,r)=>(x%8===0||y%8===0)?sh(l,r,.1):sh(c,r,.12));return[t,t,t]},
+ glow:(c,d)=>{const t=T1((x,y,r,q)=>q>.7?sh(d,r,.3):sh(c,r,.2));return[t,t,t]},
+ pln:c=>{const t=T1((x,y,r)=>y%4===3?sh(c.map(u=>u*.72),r,.15):sh(c,r,.14));return[t,t,t]},
+ brk:(c,m,mo,tq)=>{const t=T1((x,y,r,q)=>(mo&&q>(tq||.62))?sh(mo,r,.4):(y%8===7||(x+((y>>3)&1)*8)%16===7)?sh(m,r,.15):sh(c,r,.12));return[t,t,t]},
+ log:c=>{const s=T1((x,y,r)=>sh(x%4===0?c.map(u=>u*.75):c,r,.2)),p=T1((x,y,r)=>{const d=Math.max(Math.abs(x-7.5),Math.abs(y-7.5));return d>6.5?sh(c.map(u=>u*.7),r,.2):sh(c.map(u=>u*(Math.floor(d)%2?1.3:1.05)),r,.15)});return[p,s,p]},
+ f:(a,b,c)=>{const t=ft(a),s=ft(b);return[t,s,c==null?t:ft(c)]}
+};
+const MISC=[
+['redsand','Red sand','Nature','n',[190,102,52],.16],
+['redsandstone','Red sandstone','Nature','bnd',[186,98,46]],
+['coarse','Coarse dirt','Nature','sp',[126,90,62],[98,98,94]],
+['moss','Moss block','Nature','n',[88,134,48],.35],
+['packedice','Packed ice','Nature','n',[142,182,232],.1],
+['granite','Granite','Stone','sp',[154,100,84],[118,68,58]],
+['diorite','Diorite','Stone','sp',[190,190,186],[128,128,126]],
+['andesite','Andesite','Stone','sp',[138,138,134],[108,108,106]],
+['smooth','Smooth stone','Stone','n',[156,156,156],.07],
+['deepslate','Deepslate','Stone','n',[72,72,82],.25],
+['basalt','Basalt','Stone','n',[60,60,68],.25],
+['calcite','Calcite','Stone','n',[228,228,224],.06],
+['netherrack','Netherrack','Stone','n',[112,40,40],.35],
+['soulsand','Soul sand','Stone','n',[84,64,52],.3],
+['endstone','End stone','Stone','sp',[222,222,158],[196,196,120]],
+['redstone','Redstone ore','Ores','ore',[220,30,30]],
+['lapis','Lapis ore','Ores','ore',[40,70,190]],
+['emerald','Emerald ore','Ores','ore',[40,200,90]],
+['copper','Copper ore','Ores','ore',[200,120,80]],
+['ironblk','Iron block','Metal','blk',[216,216,216]],
+['goldblk','Gold block','Metal','blk',[250,214,60]],
+['diamondblk','Diamond block','Metal','blk',[100,232,224]],
+['emeraldblk','Emerald block','Metal','blk',[50,200,90]],
+['lapisblk','Lapis block','Metal','blk',[40,70,180]],
+['coalblk','Coal block','Metal','blk',[34,34,36]],
+['copperblk','Copper block','Metal','blk',[196,112,76]],
+['redstoneblk','Redstone block','Metal','blk',[180,28,24]],
+['quartz','Quartz block','Metal','bnd',[238,234,226]],
+['glowstone','Glowstone','Light','glow',[250,200,90],[196,132,40]],
+['sealantern','Sea lantern','Light','grd',[212,240,232],[110,170,170]],
+['shroom','Shroomlight','Light','glow',[242,152,62],[190,90,30]],
+['magma','Magma block','Light','glow',[150,54,10],[255,150,30]],
+['birchplank','Birch planks','Wood','pln',[216,200,150]],
+['spruceplank','Spruce planks','Wood','pln',[114,84,50]],
+['jungleplank','Jungle planks','Wood','pln',[170,120,84]],
+['acaciaplank','Acacia planks','Wood','pln',[186,100,56]],
+['sprucelog','Spruce log','Wood','log',[74,52,34]],
+['junglelog','Jungle log','Wood','log',[100,74,40]],
+['acacialog','Acacia log','Wood','log',[116,108,98]],
+['darklog','Dark oak log','Wood','log',[52,38,26]],
+['netherbrick','Nether bricks','Stone','brk',[54,20,26],[28,8,12]],
+['mossybrick','Mossy stone bricks','Stone','brk',[132,132,132],[88,88,88],[70,122,50]],
+['crackedbrick','Cracked stone bricks','Stone','brk',[132,132,132],[88,88,88],[52,52,52],.88],
+['prismarine','Prismarine bricks','Stone','brk',[86,160,150],[60,120,112]],
+['hay','Hay bale','Deco','f',(x,y,r)=>sh(Math.floor(Math.max(Math.abs(x-7.5),Math.abs(y-7.5)))%2?[206,176,52]:[184,150,38],r,.2),(x,y,r)=>(x===3||x===12)?sh([112,72,30],r,.15):sh([204,172,48],r,.3)],
+['melon','Melon','Deco','f',(x,y,r)=>sh([128,164,56],r,.3),(x,y,r)=>x%4<2?sh([108,150,40],r,.3):sh([76,112,30],r,.3)],
+['pumpkin','Pumpkin','Deco','f',(x,y,r)=>(x>6&&x<9&&y>6&&y<9)?[96,110,40]:sh([208,116,20],r,.25),(x,y,r)=>x%4===0?sh([170,90,10],r,.2):sh([222,128,24],r,.25)],
+['sponge','Sponge','Deco','sp',[224,214,84],[150,140,44]],
+['crafting','Crafting table','Deco','f',(x,y,r)=>(x%5===0||y%5===0)?sh([80,52,28],r,.15):sh([176,132,76],r,.15),(x,y,r)=>y<5?sh([84,58,32],r,.2):((x>2&&x<7&&y>7&&y<13)||(x>9&&x<13&&y>6&&y<12))?sh([100,100,104],r,.2):sh([180,136,80],r,.15),8],
+['furnace','Furnace','Deco','f',3,(x,y,r)=>(x>3&&x<12&&y>7&&y<13)?sh([40,40,44],r,.3):sh(ST,r,.3),3],
+['bone','Bone block','Deco','f',(x,y,r)=>sh(Math.floor(Math.max(Math.abs(x-7.5),Math.abs(y-7.5)))%3?[232,228,208]:[196,192,168],r,.1),(x,y,r)=>x%6===5?sh([200,196,170],r,.1):sh([232,228,208],r,.1)]
+];
+MISC.forEach(([k,n,g,rc,...a])=>{const t=RC[rc](...a);addB(k,n,t[0],t[1],t[2],0,g);if(['glowstone','sealantern','shroom','magma'].includes(k))GLOW.push(ID[k])});
+DR[ID.packedice]=0;
+const TB=['Orange','White','Yellow','Orange','Red','Brown','Light gray','White'].map(n=>ID['terra'+n]);
+for(let i=1;i<BL.length;i++)if(i!==20)PAL.push(i);
 
 /* ---------- world helpers ---------- */
 const rnd=(x,z)=>{const n=Math.sin(x*127.1+z*311.7+SEED)*43758.5453;return n-Math.floor(n)};
@@ -192,6 +280,23 @@ for(let i=0;i<(W*D/20|0);i++){
     if(dy===th+1&&(Math.abs(dx)>1||Math.abs(dz)>1))continue;
     if(!blk(x+dx,gy+dy,z+dz))put(x+dx,gy+dy,z+dz,6);
   }
+}
+calcHm();
+
+/* ---------- extra terrain: mesas, ore variety, patches ---------- */
+for(let x=0;x<W;x++)for(let z=0;z<D;z++){
+  let gy=hm[z*W+x];while(gy>0&&blk(x,gy,z)===13)gy--;
+  if(blk(x,gy,z)===4&&gy>SEA+1&&bm(x,z)>.72)
+    for(let y=gy;y>gy-16&&y>0;y--){const t=blk(x,y,z);if(t===4||t===14||t===3)put(x,y,z,y===gy?ID.redsand:TB[(y+(gy>>2))%TB.length])}
+  for(let y=1;y<gy-2;y++)if(blk(x,y,z)===3){
+    const q=Math.random();
+    const t=q<.006?ID.copper:(y<16&&q<.011)?ID.redstone:(y<20&&q<.014)?ID.lapis:(y<12&&q<.0155)?ID.emerald:q>.99?ID.granite:q>.98?ID.diorite:q>.97?ID.andesite:(y<10&&q>.9)?ID.deepslate:0;
+    if(t)put(x,y,z,t);
+  }
+}
+for(let i=0;i<W*D/50;i++){
+  const x=Math.random()*W|0,z=Math.random()*D|0,gy=hm[z*W+x];
+  if(blk(x,gy,z)===1&&!blk(x,gy+1,z))put(x,gy+1,z,Math.random()<.5?ID.melon:ID.hay);
 }
 calcHm();
 
@@ -285,7 +390,7 @@ function build(ci){
       else if(tr&&blk(nx,ny,nz)===t)continue;
       if(!j)j=1+(hash(x,y,z)-.5)*.1;
       const glow=GLOW.includes(t),lt=glow?1:(ny>hm[nz*W+nx])?1:.55;
-      const ti=f.d[1]>0?b[1]:f.d[1]<0?b[3]:b[2],u0=(ti%8)/8,v0=1-((ti>>3)+1)/6;
+      const ti=f.d[1]>0?b[1]:f.d[1]<0?b[3]:b[2],u0=(ti%8)/8,v0=1-((ti>>3)+1)/22;
       for(let q=0;q<4;q++){
         const v=f.v[q],py=y+(wt&&v[1]?wH:v[1]);
         o.p.push(x+v[0],py,z+v[2]);
@@ -298,7 +403,7 @@ function build(ci){
         const k=f.s*j*lt*a;
         o.c.push(k,k,k);
         if(wt){const X=x+v[0],Z=z+v[2];o.u.push(...(f.d[1]?[(X*fd[0]+Z*fd[1])*.5,(Z*fd[0]-X*fd[1])*.5]:[-py*.5,(f.d[0]?Z:X)*.5]))}
-        else o.u.push(u0+EP+UV[q][0]*(.125-2*EP),v0+EP+UV[q][1]*(1/6-2*EP));
+        else o.u.push(u0+EP+UV[q][0]*(.125-2*EP),v0+EP+UV[q][1]*(1/22-2*EP));
       }
       o.i.push(o.n,o.n+1,o.n+2,o.n,o.n+2,o.n+3);o.n+=4;
     }
@@ -385,8 +490,8 @@ function ray(){
   return null}
 
 /* ---------- inventory & hotbar ---------- */
-const hot=[1,2,3,5,7,9,11,12,19],inv={},DROP={1:2,3:8,19:0},bar=$('bar');
-let hotC=hot.slice(),si=0,surv=false,playing=false,invOpen=false;
+const hot=[1,2,3,5,7,9,11,12,19],inv={},DROP=Object.assign({1:2,3:8,19:0,11:0,25:0},DR),bar=$('bar');
+let hotC=hot.slice(),si=0,surv=false,playing=false,invOpen=false,grp='All';
 const icn=(id,s)=>{const c=document.createElement('canvas');c.width=c.height=s;const g=c.getContext('2d');g.imageSmoothingEnabled=false;if(id){const t=BL[id][2];g.drawImage(AT,(t%8)*16,(t>>3)*16,16,16,0,0,s,s)}return c};
 function renderHot(){
   bar.innerHTML='';
@@ -402,17 +507,23 @@ function renderHot(){
 }
 function pick(n){si=(n+9)%9;renderHot()}
 function renderInv(){
-  const g=$('grid');g.innerHTML='';
+  const g=$('grid'),q=$('sq').value.trim().toLowerCase(),ch=$('chips');g.innerHTML='';ch.innerHTML='';
+  ['All',...new Set(PAL.map(i=>BL[i][5]))].forEach(n=>{
+    const b=document.createElement('button');b.textContent=n;if(n===grp)b.className='on';
+    b.onclick=()=>{grp=n;renderInv()};ch.appendChild(b);
+  });
   PAL.forEach(id=>{
-    if(surv&&id!==WATER&&!inv[id])return;
-    const e=document.createElement('div');e.className='cell';e.title=BL[id][0];e.appendChild(icn(id,40));
+    const bl=BL[id];
+    if((grp!=='All'&&bl[5]!==grp)||(q&&!bl[0].toLowerCase().includes(q))||(surv&&id!==WATER&&!inv[id]))return;
+    const e=document.createElement('div');e.className='cell';e.title=bl[0];e.appendChild(icn(id,40));
     if(surv&&id!==WATER){const b=document.createElement('b');b.textContent=inv[id];e.appendChild(b)}
-    e.onclick=()=>{hot[si]=id;renderHot();$('is').textContent=BL[id][0]+' → slot '+(si+1)};
+    e.onclick=()=>{hot[si]=id;renderHot();$('is').textContent=bl[0]+' → slot '+(si+1)};
     g.appendChild(e);
   });
   $('md').textContent='Mode: '+(surv?'Survival':'Creative');
-  $('is').textContent=surv?'Survival: break blocks to collect them. Water is unlimited. Tap a block to put it in the selected slot.':'Creative: unlimited blocks. Tap a block to put it in the selected hotbar slot.';
+  $('is').textContent=(surv?'Survival: break blocks to collect them. Water is unlimited. ':'Creative: unlimited blocks. ')+'Tap a block to put it in the selected hotbar slot. '+PAL.length+' blocks in total.';
 }
+$('sq').oninput=()=>renderInv();
 $('md').onclick=()=>{surv=!surv;if(surv){hotC=hot.slice();hot.fill(0)}else hot.splice(0,9,...hotC);renderHot();renderInv()};
 $('clr').onclick=()=>{hot[si]=0;renderHot()};
 $('cls').onclick=()=>toggleInv();
@@ -467,6 +578,7 @@ function act(btn){
   }
 }
 addEventListener('keydown',e=>{
+  if(e.target.id==='sq'){if(e.code==='Escape')e.target.blur();return}
   if(!playing){
     if(e.code==='Enter'||e.code==='Space'){e.preventDefault();play()}
     return;
