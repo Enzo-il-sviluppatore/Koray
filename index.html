@@ -88,7 +88,7 @@ if(typeof THREE==='undefined'){document.querySelector('#menu div').innerHTML='<h
 <script>
 const touch=matchMedia('(pointer:coarse)').matches;
 document.body.classList.toggle('touch',touch);
-const W=touch?128:192,D=W,H=64,CS=16,NC=W/CS,SEA=22,SEED=Math.random()*1000,AH=26,DAYLEN=420;
+const W=touch?300:300,D=W,H=64,CS=16,NC=W/CS,SEA=22,SEED=Math.random()*1000,AH=26,DAYLEN=420;
 const world=new Uint8Array(W*H*D),hm=new Int16Array(W*D);
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
