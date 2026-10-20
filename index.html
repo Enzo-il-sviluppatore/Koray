@@ -89,7 +89,7 @@ if(typeof THREE==='undefined'){document.querySelector('#menu div').innerHTML='<h
 <script>
 const touch=matchMedia('(pointer:coarse)').matches;
 document.body.classList.toggle('touch',touch);
-const W=touch?600:600,D=W,H=192,CS=16,NC=W/CS,OFF=56,SEA=OFF+22,DSY=OFF-8,SEED=Math.random()*1000,AH=64,TS=32,DAYLEN=420,ITB=300;
+const W=touch?500:500,D=W,H=192,CS=16,NC=W/CS,OFF=56,SEA=OFF+22,DSY=OFF-8,SEED=Math.random()*1000,AH=64,TS=32,DAYLEN=420,ITB=300;
 const world=new Uint8Array(W*H*D),hm=new Int16Array(W*D);
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
