@@ -361,8 +361,8 @@ const MISC=[
 const GLK=['glowstone','sealantern','shroom','magma','rlamp','ochre','verdant','pearl'];
 MISC.forEach(([k,n,g,rc,...a])=>{const t=RC[rc](...a);addB(k,n,t[0],t[1],t[2],0,g);if(GLK.includes(k))GLOW.push(ID[k])});
 /* lava (glowing liquid) and the portal (thin purple pane) */
-const lavaT=T1((x,y,r,q,X,Y)=>{const g=R(901,X>>1,Y>>1)*.6+R(903,X>>2,Y>>2)*.4;return sh(g>.62?[255,220,90]:g>.35?[255,150,30]:[210,70,10],r,.12)});
-const LAVA=addB('lava','Lava',lavaT,lavaT,lavaT,1,'Light');GLOW.push(LAVA);
+const lavaTile=T1((x,y,r,q,X,Y)=>{const g=R(901,X>>1,Y>>1)*.6+R(903,X>>2,Y>>2)*.4;return sh(g>.62?[255,220,90]:g>.35?[255,150,30]:[210,70,10],r,.12)});
+const LAVA=addB('lava','Lava',lavaTile,lavaTile,lavaTile,1,'Light');GLOW.push(LAVA);
 const portT=T1((x,y,r,q,X,Y)=>{const s=Math.sin(X*.5+Math.sin(Y*.35)*2)+Math.sin(Y*.45+X*.2),g=.5+.25*s;return[...sh([150+60*g,40+30*g,210+30*g],r,.1),170]});
 const PORTAL=addB('portal','Nether portal',portT,portT,portT,1,'Deco');
 const FL=new Uint8Array(256);FL[WATER]=FL[LAVA]=FL[PORTAL]=1;
