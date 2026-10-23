@@ -110,7 +110,8 @@ const hx=n=>'#'+n.toString(16).padStart(6,'0');
 const BL=[null,['Grass',0,1,2],['Dirt',2,2,2],['Stone',3,3,3],['Sand',4,4,4],['Wood',6,5,6],['Leaves',7,7,7],['Planks',8,8,8],['Cobblestone',9,9,9],['Brick',10,10,10],['Snow',11,12,2],['Glass',14,14,14,1],['Lamp',21,21,21],['Cactus',20,19,20],['Sandstone',23,23,23],['Coal ore',15,15,15],['Iron ore',16,16,16],['Gold ore',17,17,17],['Diamond ore',18,18,18],['Water',13,13,13,1],['Bedrock',22,22,22],['Gravel',24,24,24],['Clay',25,25,25],['Stone bricks',26,26,26],['Obsidian',27,27,27],['Ice',28,28,28,1],['Birch wood',6,29,6],['Dark planks',30,30,30],['Bookshelf',8,31,8],['White wool',32,32,32],['Red wool',33,33,33],['Blue wool',34,34,34],['Green wool',35,35,35],['Yellow wool',36,36,36],['Black wool',37,37,37],['Jack o’lantern',39,38,39],['Mossy cobblestone',40,40,40]];
 const WATER=19,GLOW=[12,35],PAL=[];
 const isOpq=t=>t>0&&!BL[t][4];
-  /* ---------- procedural texture atlas: 16x16 pixel-art tiles, drawn at 2x (32px) ---------- */
+
+/* ---------- procedural texture atlas: 16x16 pixel-art tiles, drawn at 2x (32px) ---------- */
 const AT=document.createElement('canvas');AT.width=8*TS;AT.height=AH*TS;
 const ac=AT.getContext('2d');
 const R=(i,x,y)=>{const n=Math.sin((i*37.3+x*12.9898+y*78.233)*1.7)*43758.5453;return n-Math.floor(n)};
@@ -197,7 +198,8 @@ tile(38,(x,y,r,q,X,Y)=>{
 });
 tile(39,pumpT);
 tile(40,(x,y,r,q)=>q>.55?sh([70,120,50],r,.4):sh(ST,R(40,x>>1,y>>1),.7));
-  /* ---------- extra blocks (generated) ---------- */
+
+/* ---------- extra blocks (generated) ---------- */
 let TN=41;const ID={},DR={};
 const addB=(k,n,t,s,b,tr,g)=>{BL.push([n,t,s,b,tr?1:0,g]);return ID[k]=BL.length-1};
 const T1=fn=>{tile(TN,fn);return TN++},ft=a=>typeof a==='number'?a:T1(a);
@@ -401,7 +403,8 @@ const toolTile=(cls,mc)=>T1((x,y,r)=>{
 TM.forEach(m=>{
   [['pick','pickaxe',2],['axe','axe',3],['shovel','shovel',1.5],['sword','sword',4]].forEach(([cls,nm0,base])=>
     addI(m.k+cls[0].toUpperCase()+cls.slice(1),m.n+' '+nm0,toolTile(cls,m.c),{kind:'tool',cls,tier:m.t,sp:m.sp,dur:m.dur,dmg:base+m.atk}));
-  addI('bow','Bow',T1((x,y,r)=>{const d=Math.hypot(x-13,y-8);return(Math.abs(d-7.5)<1.1&&x<=12)?sh(HC,r,.2):(x===12&&y>=1&&y<=15)?[226,226,230]:NA}),{kind:'tool',cls:'bow',tier:0,sp:1,dur:385,dmg:1});
+});
+addI('bow','Bow',T1((x,y,r)=>{const d=Math.hypot(x-13,y-8);return(Math.abs(d-7.5)<1.1&&x<=12)?sh(HC,r,.2):(x===12&&y>=1&&y<=15)?[226,226,230]:NA}),{kind:'tool',cls:'bow',tier:0,sp:1,dur:385,dmg:1});
 addI('shears','Shears',T1((x,y,r)=>{
   if(ell(x,y,4.5,12,2.3,2.3)||ell(x,y,10.5,12,2.3,2.3))return(ell(x,y,4.5,12,1,1)||ell(x,y,10.5,12,1,1))?NA:sh([200,60,60],r,.2);
   return(y>=2&&y<=10&&(Math.abs(x-(5+(10-y)*.6))<.8||Math.abs(x-(10-(10-y)*.6))<.8))?sh([214,214,220],r,.12):NA}),{kind:'tool',cls:'shears',tier:0,sp:6,dur:238,dmg:1});
@@ -553,7 +556,8 @@ const hitB=(x,y,z,hw,h)=>{
   for(let k=Math.floor(z-hw);k<=Math.floor(z+hw);k++)if(hard(i,j,k))return true;
   return false};
 const hit=(x,y,z)=>hitB(x,y,z,.3,1.8);
-  /* ---------- terrain generation ---------- */
+
+/* ---------- terrain generation ---------- */
 for(let x=0;x<W;x++)for(let z=0;z<D;z++){
   const m=bm(x,z),n1=noise(x/50,z/50);
   const h=Math.floor(OFF+12+Math.pow(n1,1.7)*48+noise(x/16,z/16)*8+noise(x/5,z/5)*1.5);
@@ -732,7 +736,6 @@ function flowCell(i){
     if(!n||(n===WATER&&lw(nx,y,nz)<L-1))setW(nx,y,nz,WATER,L-1);
   }
 }
-
 /* ---------- flowing lava, fire, lava + water ---------- */
 const FLM=new Uint8Array(256),burning=new Map();
 for(let i=1;i<BL.length;i++){const n=BL[i][0];if(/^(wood|leaves|planks|birch wood|dark planks|bookshelf|cactus|jack|crafting|chest|barrel|jukebox|note block|hay|melon|pumpkin|honeycomb|dried kelp|tnt)|wool$|log$|planks$|^stripped/i.test(n)&&!/crimson|warped/i.test(n))FLM[i]=1}
@@ -849,7 +852,8 @@ const wT=()=>{const t=new THREE.CanvasTexture(WC);t.wrapS=t.wrapT=THREE.RepeatWr
 const nearW=(x,z)=>{for(let dx=-14;dx<=14;dx+=2)for(let dz=-14;dz<=14;dz+=2)if(blk(x+dx,SEA,z+dz)===WATER)return true;return false};
 for(let x=1;x<W-1;x++)for(let z=1;z<D-1;z++)for(let y=2;y<=SEA;y++)
   if(world[ix(x,y,z)]===WATER&&(!blk(x,y-1,z)||!blk(x+1,y,z)||!blk(x-1,y,z)||!blk(x,y,z+1)||!blk(x,y,z-1)))wact.add(ix(x,y,z));
-  /* ---------- renderer, lights, sky ---------- */
+
+/* ---------- renderer, lights, sky ---------- */
 const cv=$('cv'),renderer=new THREE.WebGLRenderer({canvas:cv,antialias:!touch});
 renderer.shadowMap.enabled=!touch;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const scene=new THREE.Scene();
@@ -1234,7 +1238,8 @@ function ambient(dt,uw){
   birdT-=dt;
   if(birdT<=0){birdT=6+Math.random()*12;if(dayK>.6&&exposed&&!uw&&P.y>SEA-2)chirp()}
 }
-  /* ---------- player movement ---------- */
+
+/* ---------- player movement ---------- */
 let lavaT=0,portalT=0,portalLock=false,trav=false;
 function update(dt){
   const k=keys;
@@ -1729,7 +1734,8 @@ function breakPortal(x,y,z){
     for(const[a,b,c]of N6)if(blk(X+a,Y+b,Z+c)===PORTAL)st.push([X+a,Y+b,Z+c]);
   }
 }
-  /* ---------- player character & camera views ---------- */
+
+/* ---------- player character & camera views ---------- */
 const SKIN=[0xf1c27d,0xe0ac69,0xc68642,0x8d5524,0xffdbac],HAIR=[0x3b2a1a,0x111111,0xd8b45a,0xa52a1a,0xdddddd,0x5a3a8a],SHIRT=[0x2aa6c4,0xc43a3a,0x3aa655,0xe0b030,0x8a5ac4,0x222222,0xeeeeee],PANTS=[0x3a3f9a,0x333333,0x6a4a2a,0x2a6a3a,0x8a2a5a,0xc8c8c8];
 const CHR={skin:0,hair:0,shirt:0,pants:0},CPAL={skin:SKIN,hair:HAIR,shirt:SHIRT,pants:PANTS},VNAME=['First person','Third person (back)','Third person (front)'];
 try{const s=JSON.parse(localStorage.getItem('bc_chr')||'null');if(s)for(const k in CHR)if(Number.isInteger(s[k]))CHR[k]=s[k]}catch(e){}
@@ -2147,7 +2153,8 @@ function setMode(s){
 function toggleFly(){P.fly=!P.fly;P.vy=0;$('bFly').classList.toggle('dn',P.fly)}
 function lock(){if(!touch)try{const p=cv.requestPointerLock();if(p&&p.catch)p.catch(()=>{})}catch(e){}}
 renderHud();renderHp();
-  /* ---------- menu, keyboard & mouse ---------- */
+
+/* ---------- menu, keyboard & mouse ---------- */
 const menu=$('menu');
 $('mt').textContent=touch?'Tap anywhere to play.':'Press Enter or Space to play. (Clicking also works.)';
 $('mh').innerHTML=touch
