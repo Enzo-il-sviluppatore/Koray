@@ -365,11 +365,18 @@ const lavaTile=T1((x,y,r,q,X,Y)=>{const g=R(901,X>>1,Y>>1)*.6+R(903,X>>2,Y>>2)*.
 const LAVA=addB('lava','Lava',lavaTile,lavaTile,lavaTile,1,'Light');GLOW.push(LAVA);
 const portT=T1((x,y,r,q,X,Y)=>{const s=Math.sin(X*.5+Math.sin(Y*.35)*2)+Math.sin(Y*.45+X*.2),g=.5+.25*s;return[...sh([150+60*g,40+30*g,210+30*g],r,.1),170]});
 const PORTAL=addB('portal','Nether portal',portT,portT,portT,1,'Deco');
-const FL=new Uint8Array(256);FL[WATER]=FL[LAVA]=FL[PORTAL]=1;
+const fireTile=T1((x,y,r,q)=>{
+  const hg=11-Math.abs(x-7.5)*.9+Math.sin(x*1.9)*2.4+q*2,k=y-(16-hg);
+  if(k<0)return[0,0,0,0];
+  const t=k/hg;
+  return[...sh(t>.7?[255,236,120]:t>.35?[255,170,40]:[230,90,20],r,.25),255];
+});
+const FIRE=addB('fire','Fire',fireTile,fireTile,fireTile,1,'Light');
+const FL=new Uint8Array(256);FL[WATER]=FL[LAVA]=FL[PORTAL]=FL[FIRE]=1;
 DR[ID.packedice]=0;
 const TB=['Orange','White','Yellow','Orange','Red','Brown','Light gray','White'].map(n=>ID['terra'+n]);
 const DEEP={15:ID.dcoal,16:ID.diron,17:ID.dgold,18:ID.ddiamond,[ID.redstone]:ID.dredstone,[ID.lapis]:ID.dlapis,[ID.copper]:ID.dcopper,[ID.emerald]:ID.demerald};
-for(let i=1;i<BL.length;i++)if(i!==20&&i!==PORTAL)PAL.push(i);
+for(let i=1;i<BL.length;i++)if(i!==20&&i!==PORTAL&&i!==FIRE)PAL.push(i);
 const GF=new Uint8Array(256);GLOW.forEach(i=>GF[i]=1);
 /* blocks whose texture gets a random 90-degree turn per block, so large areas never look like a grid */
 const RB=new Set([2,3,4,6,21,22,ID.deepslate,ID.netherrack,ID.endstone,ID.granite,ID.diorite,ID.andesite,ID.tuff,ID.coarse,ID.soulsand,ID.redsand,ID.blackstone,ID.basalt,ID.calcite,ID.mud,ID.packedmud,ID.moss,ID.wart,ID.warpedwart,ID.sculk,ID.cobbleds,ID.dripstone]);
@@ -445,7 +452,7 @@ for(let id=1;id<BL.length;id++){
   else if(is(/netherite|ancient debris/i)){h=30;c='pick';t=3;nd=true}
   else if(is(/obsidian/i)){h=25;c='pick';t=3;nd=true}
   else if(is(/ore$/i)){h=3;c='pick';nd=true;t=is(/coal|quartz|nether gold/i)?0:is(/iron|copper|lapis/i)?1:2}
-  else if(is(/^tnt$/i))h=0;
+  else if(is(/^(tnt|fire)$/i))h=0;
   else if(is(/glass|^ice$|lamp|froglight|glowstone|sea lantern/i))h=.35;
   else if(is(/leaves/i)){h=.25;c='shears'}
   else if(is(/wool/i)){h=.8;c='shears'}
@@ -460,7 +467,7 @@ for(let id=1;id<BL.length;id++){
 }
 const DROPX={1:2,3:8,15:II.coal,18:II.diamond,11:0,19:0,20:0,25:0};
 DROPX[ID.emerald]=II.emerald;DROPX[ID.demerald]=II.emerald;DROPX[ID.dcoal]=II.coal;DROPX[ID.ddiamond]=II.diamond;DROPX[ID.nquartz]=II.quartz;
-Object.keys(DR).forEach(k=>DROPX[k]=0);
+Object.keys(DR).forEach(k=>DROPX[k]=0);DROPX[FIRE]=0;
 function dropOf(id,tool){
   const r=HRD[id];
   if(r.nd&&!(tool&&tool.cls===r.c&&tool.tier>=r.t))return null;
@@ -759,11 +766,32 @@ function setLava(x,y,z,l){
   }
   cs.forEach(c=>dirty.add(c));
 }
-function ignite(i){if(!burning.has(i))burning.set(i,.9+Math.random()*2.4)}
+let nearF=null;
+function placeFire(x,y,z){if(inb(x,y,z)&&!blk(x,y,z)&&y<topY())setBlock(x,y,z,FIRE)}
+function ignite(i){
+  if(burning.has(i))return;
+  burning.set(i,.9+Math.random()*2.4);
+  const x=i%W,z=((i/W)|0)%D,y=(i/(W*D))|0;
+  for(const[a,b,c]of N6)if(Math.random()<.6)placeFire(x+a,y+b,z+c);
+}
+function fireCell(i){
+  if(world[i]!==FIRE)return;
+  const x=i%W,z=((i/W)|0)%D,y=(i/(W*D))|0;
+  let fuel=false;
+  for(const[a,b,c]of N6){
+    const X=x+a,Y=y+b,Z=z+c,n=blk(X,Y,Z);
+    if(n===WATER){setBlock(x,y,z,0);burst(x+.5,y+.6,z+.5,ID.calcite);if(Math.random()<.5)hiss(x,y,z);return}
+    if(FLM[n]){fuel=true;if(Math.random()<.04)ignite(ix(X,Y,Z))}
+  }
+  const age=wl[i]=Math.min(255,wl[i]+1);
+  if(!fuel&&age>14&&Math.random()<.1){setBlock(x,y,z,0);return}
+  const d=Math.hypot(x+.5-P.x,y-P.y,z+.5-P.z);if(!nearF||d<nearF.d)nearF={x,y,z,d};
+  wact.add(i);
+}
 function burnOut(i){
   const x=i%W,z=((i/W)|0)%D,y=(i/(W*D))|0,b=world[i];
   CT.delete(x+','+y+','+z);
-  setBlock(x,y,z,0);
+  setBlock(x,y,z,b===ID.tnt?0:FIRE);
   burst(x+.5,y+.5,z+.5,b);
   if(b===ID.tnt)primeTNT(x+.5,y,z+.5,.8);
   for(let a=-1;a<=1;a++)for(let c=-1;c<=1;c++)for(let d=-1;d<=2;d++){
@@ -797,13 +825,13 @@ function lavaCell(i){
   let down=false;
   if(y>0){
     const b=blk(x,y-1,z);
-    if(!b||FLM[b]){if(b)burnNow(x,y-1,z);setLava(x,y-1,z,7);down=true}
+    if(!b||b===FIRE||FLM[b]){if(FLM[b])burnNow(x,y-1,z);setLava(x,y-1,z,7);down=true}
     else if(b===LAVA){if(lw(x,y-1,z)<7)setLava(x,y-1,z,7);down=true}
   }
   if(L-dec>=1&&(L===8||!down))for(const[dx,dz]of ND){
     const nx=x+dx,nz=z+dz;if(!inb(nx,y,nz))continue;
     const n=blk(nx,y,nz);
-    if(!n||FLM[n]||(n===LAVA&&lw(nx,y,nz)<L-dec)){if(n&&n!==LAVA)burnNow(nx,y,nz);setLava(nx,y,nz,L-dec)}
+    if(!n||n===FIRE||FLM[n]||(n===LAVA&&lw(nx,y,nz)<L-dec)){if(FLM[n])burnNow(nx,y,nz);setLava(nx,y,nz,L-dec)}
   }
 }
 function fireTick(dt){
@@ -816,7 +844,7 @@ function fireTick(dt){
   for(const m of mobs.slice()){
     const c=MOB[m.t];if(c.fireproof||m.dead)continue;
     const bb=blk(Math.floor(m.x),Math.floor(m.y+.3),Math.floor(m.z));
-    if(bb===LAVA)m.fire=6;else if(bb===WATER)m.fire=0;
+    if(bb===LAVA||bb===FIRE)m.fire=6;else if(bb===WATER)m.fire=0;
     if(m.fire>0){
       m.fire-=dt;m.fa=(m.fa||0)+dt;
       if(m.fa>=.7){m.fa=0;damageMob(m,2)}
@@ -824,18 +852,19 @@ function fireTick(dt){
     }
   }
   const px=Math.floor(P.x),pz=Math.floor(P.z),f0=blk(px,Math.floor(P.y+.4),pz),f1=blk(px,Math.floor(P.y+1.4),pz);
-  if(f0===LAVA||f1===LAVA){if(!pFire)toast('You’re on fire!');pFire=5}
+  if(f0===LAVA||f1===LAVA||f0===FIRE||f1===FIRE){if(!pFire)toast('You’re on fire!');pFire=5}
   else if(f0===WATER||f1===WATER)pFire=0;
   if(dead>0)pFire=0;
   if(pFire>0){pFire-=dt;pFA+=dt;if(pFA>=1){pFA=0;hurtPlayer(1)}}
 }
 function flowTick(){
-  lavaTk++;
+  lavaTk++;nearF=null;
   const lg=lavaTk%(dim?3:7)===0,cur=[...wact];wact.clear();
   cur.forEach((i,n)=>{
     if(n>=3000){wact.add(i);return}
     const b=world[i];
     if(b===LAVA){if(!lavaReact(i)){if(lg)lavaCell(i);else wact.add(i)}}
+    else if(b===FIRE)fireCell(i);
     else flowCell(i);
   });
   fireTick(.12);
@@ -866,6 +895,7 @@ if(!touch){const s=sun.shadow;s.mapSize.set(2048,2048);const c=s.camera;c.left=c
 scene.add(sun,sun.target);
 const moon=new THREE.DirectionalLight(0x7f95d0,0);scene.add(moon,moon.target);
 const plight=new THREE.PointLight(0xffd9a0,0,16);scene.add(plight);
+const flight=new THREE.PointLight(0xff8a30,0,16);scene.add(flight);
 const tex=new THREE.CanvasTexture(AT);
 tex.magFilter=THREE.NearestFilter;tex.minFilter=THREE.NearestMipmapNearestFilter;tex.generateMipmaps=true;
 tex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
@@ -909,12 +939,21 @@ const F=[
 F.forEach(f=>{f.t=[0,1,2].filter(i=>!f.d[i])});
 const UV=[[0,0],[1,0],[1,1],[0,1]],AOV=[.5,.7,.85,1],EPU=.0008,EPV=.0002;
 const ao=(a,b,c,p,dp,r,dr)=>{const q=[a,b,c];q[p]+=dp;q[r]+=dr;return solid(q[0],q[1],q[2])?1:0};
-const meshes=[],dirty=new Set(),CMAT=[matO,matT,matWs,matWf,matG];
+const matF=new THREE.MeshBasicMaterial({map:tex,vertexColors:true,transparent:true,alphaTest:.3,depthWrite:false,side:THREE.DoubleSide});
+const meshes=[],dirty=new Set(),CMAT=[matO,matT,matWs,matWf,matG,matF];
 const lh=(x,y,z)=>blk(x,y,z)===LAVA?(blk(x,y+1,z)===LAVA?1:lw(x,y,z)>=8?.88:.1+lw(x,y,z)*.1):0;
 function build(ci){
-  const cx=ci%NC,cz=(ci/NC)|0,S=[0,1,2,3,4].map(()=>({p:[],c:[],u:[],nm:[],bl:[],i:[],n:0})),top=Math.min(H-1,ctop[ci]+1);
+  const cx=ci%NC,cz=(ci/NC)|0,S=[0,1,2,3,4,5].map(()=>({p:[],c:[],u:[],nm:[],bl:[],i:[],n:0})),top=Math.min(H-1,ctop[ci]+1);
   for(let y=0;y<=top;y++)for(let z=cz*CS;z<cz*CS+CS;z++)for(let x=cx*CS;x<cx*CS+CS;x++){
     const t=world[(y*D+z)*W+x];if(!t)continue;
+    if(t===FIRE){
+      const o=S[5],ti=BL[FIRE][1],u0=(ti%8)/8,v0=1-((ti>>3)+1)/AH;
+      for(const vs of[[[0,0,0],[1,0,1],[1,.95,1],[0,.95,0]],[[1,0,0],[0,0,1],[0,.95,1],[1,.95,0]]]){
+        vs.forEach((v,q)=>{o.p.push(x+v[0],y+v[1],z+v[2]);o.nm.push(0,1,0);o.c.push(1,1,1);o.bl.push(0);o.u.push(u0+EPU+UV[q][0]*(.125-2*EPU),v0+EPV+UV[q][1]*(1/AH-2*EPV))});
+        o.i.push(o.n,o.n+1,o.n+2,o.n,o.n+2,o.n+3);o.n+=4;
+      }
+      continue;
+    }
     if(t===PORTAL){
       const ax=wl[(y*D+z)*W+x],o=S[1],ti=BL[PORTAL][1],u0=(ti%8)/8,v0=1-((ti>>3)+1)/AH;
       const vs=ax===2?[[.5,0,0],[.5,0,1],[.5,1,1],[.5,1,0]]:[[0,0,.5],[1,0,.5],[1,1,.5],[0,1,.5]];
@@ -1105,7 +1144,7 @@ function partGeo(ti){
 }
 function burst(x,y,z,id){
   if(parts.length>70)return;
-  const b=BL[id],n=touch?6:12;
+  const b=BL[id===FIRE?LAVA:id],n=touch?6:12;
   for(let i=0;i<n;i++){
     const m=new THREE.Mesh(partGeo(i%4===0?b[1]:b[2]),partMat);
     m.position.set(x+(Math.random()-.5)*.7,y+(Math.random()-.5)*.7,z+(Math.random()-.5)*.7);
@@ -1292,7 +1331,7 @@ function update(dt){
   if(!trav)$('pv').style.opacity=inP&&!portalLock?clamp(portalT/need,0,1)*.75:0;
   if(P.y<-20)die();
 }
-function ray(o,d,mx){
+function ray(o,d,mx,pf){
   let x=Math.floor(o.x),y=Math.floor(o.y),z=Math.floor(o.z);
   const sx=Math.sign(d.x),sy=Math.sign(d.y),sz=Math.sign(d.z);
   const dx=d.x?1/Math.abs(d.x):Infinity,dy=d.y?1/Math.abs(d.y):Infinity,dz=d.z?1/Math.abs(d.z):Infinity;
@@ -1301,7 +1340,7 @@ function ray(o,d,mx){
   const lim=mx||5.5;
   while(t<lim){
     const q=blk(x,y,z);
-    if(q&&!FL[q])return{x,y,z,n,q,t};
+    if(q&&(!FL[q]||(pf&&q===FIRE)))return{x,y,z,n,q,t};
     if(tx<ty&&tx<tz){x+=sx;t=tx;tx+=dx;n=[-sx,0,0]}
     else if(ty<tz){y+=sy;t=ty;ty+=dy;n=[0,-sy,0]}
     else{z+=sz;t=tz;tz+=dz;n=[0,0,-sz]}
@@ -1317,7 +1356,7 @@ function rayBox(o,d,x0,y0,z0,x1,y1,z1){
 }
 function rayAll(){
   const o=new THREE.Vector3(P.x,P.y+1.62,P.z),cp=Math.cos(P.pitch),d=new THREE.Vector3(-Math.sin(P.yaw)*cp,Math.sin(P.pitch),-Math.cos(P.yaw)*cp);
-  const b=ray(o,d);let best=b?{blk:b,t:b.t}:null;
+  const b=ray(o,d,0,1);let best=b?{blk:b,t:b.t}:null;
   for(const m of mobs){
     const c=MOB[m.t],tt=rayBox(o,d,m.x-c.hw,m.y,m.z-c.hw,m.x+c.hw,m.y+c.h,m.z+c.hw);
     if(tt!==null&&tt<=4.5&&(!best||tt<best.t))best={mob:m,t:tt};
@@ -1903,6 +1942,7 @@ function use(){
     }else if(it.cls==='fns'){
       if(h&&h.q===ID.tnt){setBlock(h.x,h.y,h.z,0,true);primeTNT(h.x+.5,h.y,h.z+.5,3);useTool(1);swingT=.25}
       else if(h&&h.q===24&&lightPortal(h)){useTool(1);swingT=.25}
+      else if(h){const fx=h.x+h.n[0],fy=h.y+h.n[1],fz=h.z+h.n[2];if(inb(fx,fy,fz)&&!blk(fx,fy,fz)&&fy<topY()){placeFire(fx,fy,fz);aNoise(.18,.35,'highpass',3000,5000);useTool(1);swingT=.25}}
     }
     return;
   }
@@ -1913,7 +1953,7 @@ function use(){
     if(!c||c===WATER||c===LAVA){burst(x+.5,y+.6,z+.5,ID.calcite);hiss(x,y,z);swingT=.25;toast('The water evaporates in the Nether')}
     return;
   }
-  if(inb(x,y,z)&&(!c||c===WATER||c===LAVA)&&(s.id===WATER||s.id===LAVA||!overlap(x,y,z))){
+  if(inb(x,y,z)&&(!c||c===WATER||c===LAVA||c===FIRE)&&(s.id===WATER||s.id===LAVA||!overlap(x,y,z))){
     let id=s.id,fx=0;
     if(id===WATER&&c===LAVA){id=lw(x,y,z)>=8?24:8;fx=1}
     else if(id===LAVA&&c===WATER){id=24;fx=1}
@@ -2312,6 +2352,7 @@ function frame(now){
   }
   partsTick(dt);
   skyUpdate();
+  matF.opacity=.82+.18*Math.sin(now*.03);
   wtS.offset.x=-(now/1000*.04)%1;wtF.offset.x=-(now/1000*.5)%1;
   const t0=performance.now();let nb=0;
   for(const ci of dirty){
@@ -2331,6 +2372,7 @@ function frame(now){
   scene.background.copy(scene.fog.color);
   const hs=slots[si],glowHeld=hs&&hs.id<ITB&&GF[hs.id];
   plight.position.copy(camera.position);plight.intensity=glowHeld?1.1:0;
+  if(nearF&&nearF.d<16){flight.position.set(nearF.x+.5,nearF.y+.7,nearF.z+.5);flight.intensity=(1.3+Math.sin(now*.031)*.3)*(1-nearF.d/16)}else flight.intensity=0;
   const hv=Math.hypot(P.vx,P.vz),sw=swingT>0?Math.sin((1-swingT/.3)*Math.PI):0;
   hand.position.set(.5,-.46+Math.sin(P.bob*3)*.012*Math.min(1,hv/4)-sw*.1,-.9-sw*.1);
   hand.rotation.set(-sw*1.1,-.15,-sw*.4);
