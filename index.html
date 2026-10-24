@@ -107,7 +107,7 @@ if(typeof THREE==='undefined'){document.querySelector('#menu div').innerHTML='<h
 <script>
 const touch=matchMedia('(pointer:coarse)').matches;
 document.body.classList.toggle('touch',touch);
-const W=touch?130:200,D=W,H=192,CS=16,NC=W/CS,OFF=56,SEA=OFF+22,DSY=OFF-8,SEED=Math.random()*1000,AH=64,TS=32,DAYLEN=420,ITB=300,NETH=128,LAVAY=32;
+const W=touch?128:192,D=W,H=192,CS=16,NC=W/CS,OFF=56,SEA=OFF+22,DSY=OFF-8,SEED=Math.random()*1000,AH=64,TS=32,DAYLEN=420,ITB=300,NETH=128,LAVAY=32;
 let dim=0;
 const world=new Uint8Array(W*H*D),hm=new Int16Array(W*D);
 const $=id=>document.getElementById(id);
